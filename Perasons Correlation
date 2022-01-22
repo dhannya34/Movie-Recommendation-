@@ -1,0 +1,55 @@
+import numpy as np 
+import pandas as pd
+
+#importing movie metadata
+movies_metadata = pd.read_csv("movies_metadata.csv")
+movies_metadata = movies_metadata[['id', 'original_title', 'original_language']]
+movies_metadata = movies_metadata.rename(columns = {'id':'movieId'})
+movies_metadata = movies_metadata[movies_metadata['original_language'] == 'en'] #just want movies in English
+
+#importing movie ratings
+ratings = pd.read_csv("ratings.csv")
+ratings = ratings[['userId', 'movieId', 'rating']]
+ratings = ratings.head(1000)
+
+#convert data types before merging
+movies_metadata.movieId = pd.to_numeric(movies_metadata.movieId, errors = 'coerce')
+ratings.movieId = pd.to_numeric(ratings.movieId, errors = 'coerce')
+
+#create a single dataset merging movies_metadata & ratings
+data = pd.merge(ratings, movies_metadata, on = 'movieId', how = 'inner')
+
+#movie matrix 
+movie_matrix = data.pivot_table(index = 'userId', columns = 'original_title', values = 'rating')
+
+# Compute Pearson Correlation
+def pearsonR(x_value, y_value):
+    x_dev = x_value-x_value.mean()
+    y_dev = y_value-y_value.mean()
+    return np.sum(x_dev * y_dev) / np.sqrt(np.sum(x_dev ** 2)* np.sum(y_dev ** 2))
+
+# Recommendations based on Pearson Correlation.
+# movie --> Name of watched movie
+# M --> Movie matrix
+# N --> Number of recommendations
+
+def recommend(movie, M, N):
+    reviews = []
+    for title in M.columns:
+        if title == movie:
+            continue
+        cor = pearsonR(M[movie], M[title])
+        if np.isnan(cor):
+            continue
+        else:
+            reviews.append((title, cor))
+            
+    reviews.sort(key = lambda tup: tup[1], reverse = True)
+    return reviews[:N]
+    
+# List with movies I have watched:
+watched = ['Young and Innocent', 'A Brief History of Time']
+
+recommended = recommend('Young and Innocent', movie_matrix, 10) #top 10 recommendations
+recommended_list = [recommended_movie for recommended_movie in recommended if recommended_movie[0] not in watched]
+recommended_list
